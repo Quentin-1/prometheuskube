@@ -1,87 +1,40 @@
+﻿# Installation de Prometheus sur Kubernetes
 
-## Prerequisites
+Prometheus est un système de surveillance open-source conçu pour la collecte et l'alerte basée sur les métriques. Dans cet exemple, nous allons installer Prometheus dans un cluster Kubernetes.
 
-You will need a Kubernetes cluster, that's it! By default it is assumed, that the kubelet uses token authentication and authorization, as otherwise Prometheus needs a client certificate, which gives it full access to the kubelet, rather than just the metrics. Token authentication and authorization allows more fine grained and easier access control.
+## Prérequis
 
-This means the kubelet configuration must contain these flags:
+-   Un cluster Kubernetes en cours d'exécution
+-   kubectl installé et configuré pour accéder à votre cluster
+-   Helm installé sur votre machine locale et configuré pour accéder à votre cluster
 
-* `--authentication-token-webhook=true` This flag enables, that a `ServiceAccount` token can be used to authenticate against the kubelet(s). This can also be enabled by setting the kubelet configuration value `authentication.webhook.enabled` to `true`.
-* `--authorization-mode=Webhook` This flag enables, that the kubelet will perform an RBAC request with the API to determine, whether the requesting entity (Prometheus in this case) is allowed to access a resource, in specific for this project the `/metrics` endpoint. This can also be enabled by setting the kubelet configuration value `authorization.mode` to `Webhook`.
+## Étapes d'installation
 
-This stack provides [resource metrics](https://github.com/kubernetes/metrics#resource-metrics-api) by deploying
-the [Prometheus Adapter](https://github.com/kubernetes-sigs/prometheus-adapter).
-This adapter is an Extension API Server and Kubernetes needs to be have this feature enabled, otherwise the adapter has
-no effect, but is still deployed.
+### 1. Configuration de Helm
 
-## Compatibility
+`helm repo add prometheus-community https://prometheus-community.github.io/helm-charts helm repo update`
 
-The following Kubernetes versions are supported and work as we test against these versions in their respective branches. But note that other versions might work!
+### 2. Installation de Prometheus
 
-| kube-prometheus stack                                                                      | Kubernetes 1.22 | Kubernetes 1.23 | Kubernetes 1.24 | Kubernetes 1.25 | Kubernetes 1.26 | Kubernetes 1.27 | Kubernetes 1.28 |
-|--------------------------------------------------------------------------------------------|-----------------|-----------------|-----------------|-----------------|-----------------|-----------------|-----------------|
-| [`release-0.10`](https://github.com/prometheus-operator/kube-prometheus/tree/release-0.10) | ✔               | ✔               | ✗               | ✗               | x               | x               | x               |
-| [`release-0.11`](https://github.com/prometheus-operator/kube-prometheus/tree/release-0.11) | ✗               | ✔               | ✔               | ✗               | x               | x               | x               |
-| [`release-0.12`](https://github.com/prometheus-operator/kube-prometheus/tree/release-0.12) | ✗               | ✗               | ✔               | ✔               | x               | x               | x               |
-| [`release-0.13`](https://github.com/prometheus-operator/kube-prometheus/tree/release-0.13) | ✗               | ✗               | ✗               | x               | ✔               | ✔               | ✔               |
-| [`main`](https://github.com/prometheus-operator/kube-prometheus/tree/main)                 | ✗               | ✗               | ✗               | x               | x               | ✔               | ✔               |
+`kubectl create namespace monitoring helm install prometheus prometheus-community/prometheus --namespace monitoring`
 
-## Quickstart
+### 3. Accès à l'interface utilisateur de Prometheus
 
-> Note: For versions before Kubernetes v1.21.z refer to the [Kubernetes compatibility matrix](#compatibility) in order to choose a compatible branch.
+`kubectl port-forward -n monitoring svc/prometheus-server 9090:80`
 
-This project is intended to be used as a library (i.e. the intent is not for you to create your own modified copy of this repository).
+Ouvrez votre navigateur et accédez à http://localhost:9090 pour accéder à l'interface utilisateur de Prometheus.
 
-Though for a quickstart a compiled version of the Kubernetes [manifests](manifests) generated with this library (specifically with `example.jsonnet`) is checked into this repository in order to try the content out quickly. To try out the stack un-customized run:
-* Create the monitoring stack using the config in the `manifests` directory:
+### 4. Configuration des cibles de surveillance
 
-```shell
-# Create the namespace and CRDs, and then wait for them to be available before creating the remaining resources
-# Note that due to some CRD size we are using kubectl server-side apply feature which is generally available since kubernetes 1.22.
-# If you are using previous kubernetes versions this feature may not be available and you would need to use kubectl create instead.
-kubectl apply --server-side -f manifests/setup
-kubectl wait \
-	--for condition=Established \
-	--all CustomResourceDefinition \
-	--namespace=monitoring
-kubectl apply -f manifests/
-```
+Pour configurer les cibles à surveiller, vous pouvez modifier le fichier `values.yaml` lors de l'installation ou utiliser la console web de Prometheus.
 
-We create the namespace and CustomResourceDefinitions first to avoid race conditions when deploying the monitoring components.
-Alternatively, the resources in both folders can be applied with a single command
-`kubectl apply --server-side -f manifests/setup -f manifests`, but it may be necessary to run the command multiple times for all components to
-be created successfully.
+### 5. Suppression
 
-* And to teardown the stack:
+`helm uninstall prometheus -n monitoring kubectl delete namespace monitoring`
 
-```shell
-kubectl delete --ignore-not-found=true -f manifests/ -f manifests/setup
-```
+Cela désinstallera Prometheus et supprimera le namespace associé.
 
-### minikube
+## Conclusion
 
-To try out this stack, start [minikube](https://github.com/kubernetes/minikube) with the following command:
-
-```shell
-$ minikube delete && minikube start --kubernetes-version=v1.23.0 --memory=6g --bootstrapper=kubeadm --extra-config=kubelet.authentication-token-webhook=true --extra-config=kubelet.authorization-mode=Webhook --extra-config=scheduler.bind-address=0.0.0.0 --extra-config=controller-manager.bind-address=0.0.0.0
-```
-
-The kube-prometheus stack includes a resource metrics API server, so the metrics-server addon is not necessary. Ensure the metrics-server addon is disabled on minikube:
-
-```shell
-$ minikube addons disable metrics-server
-```
-
-## Getting started
-
-Before deploying kube-prometheus in a production environment, read:
-
-1. [Customizing kube-prometheus](docs/customizing.md)
-2. [Customization examples](docs/customizations)
-3. [Accessing Graphical User Interfaces](docs/access-ui.md)
-4. [Troubleshooting kube-prometheus](docs/troubleshooting.md)
-
-## Documentation
-
-1. [Continuous Delivery](examples/continuous-delivery)
-2. [Update to new version](docs/update.md)
-3. For more documentation on the project refer to `docs/` directory.
+Félicitations, Prometheus est bien installé dans votre cluster Kubernetes. 
+Pour plus d'infos (lien de la doc officiel) : https://prometheus.io/docs/introduction/overview/
